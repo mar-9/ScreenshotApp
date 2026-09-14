@@ -102,6 +102,11 @@ public sealed class OverlayForm : Form
             selRect.Width,
             selRect.Height);
 
+        // 半透明の灰色オーバーレイがキャプチャに写り込まないよう、
+        // 先に画面から消してから呼び出し元に通知する。
+        // (呼び出し元は実際にキャプチャを行う前に、画面の再描画を待つ
+        //  ための短いディレイを挟むこと)
+        Hide();
         SelectionCompleted?.Invoke(screenRect);
         Close();
     }

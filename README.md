@@ -7,6 +7,9 @@ Windows タスクトレイに常駐し、`Ctrl+Shift+S` で画面上の矩形範
 - タスクトレイ常駐（NotifyIcon）
 - グローバルホットキー `Ctrl+Shift+S`（アプリがアクティブでなくても動作）
 - ドラッグで矩形範囲を選択 → キャプチャ（マルチモニター対応）
+- `Ctrl+1` で、範囲選択をやり直さず直前と同じ範囲を再キャプチャ
+- 選択オーバーレイの灰色がキャプチャ画像に写り込まないよう、非表示後にキャプチャする対策済み
+- キャプチャ画像は縦横比を維持したまま **60%** にリサイズしてから保存・コピー（倍率は `TrayApplicationContext.cs` の `ResizeScale` で変更可）
 - 撮影結果はクリップボードに自動コピー
 - 既定では `%USERPROFILE%\Pictures\Screenshots` に PNG として保存（トレイメニューから「クリップボードにのみコピー」に切り替え可）
 - Windows 起動時の自動起動 ON/OFF（トレイメニューのチェックボックス）
@@ -39,16 +42,23 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 1. `ScreenshotApp.exe` を起動する（コンソールは開きません。タスクトレイにアイコンが表示されます）
 2. `Ctrl+Shift+S` を押す、またはトレイアイコンをダブルクリック
 3. 画面が少し暗くなるので、キャプチャしたい範囲をドラッグして選択
-4. マウスを離すとキャプチャされ、クリップボードにコピー（設定により保存も）されます
-5. トレイアイコン右クリックで各種設定・終了ができます
+4. マウスを離すとキャプチャされ、60%にリサイズした上でクリップボードにコピー（設定により保存も）されます
+5. 同じ範囲をもう一度撮りたいときは `Ctrl+1`（選択操作は不要）
+6. トレイアイコン右クリックで各種設定・終了ができます
 
 ## カスタマイズしたい場合
 
 - **ホットキーを変更したい**：`TrayApplicationContext.cs` 内の
   ```csharp
-  _hotkeyManager.Register(HotkeyManager.Modifiers.Control | HotkeyManager.Modifiers.Shift, Keys.S);
+  _captureHotkeyId = _hotkeyManager.Register(HotkeyManager.Modifiers.Control | HotkeyManager.Modifiers.Shift, Keys.S);
+  _repeatHotkeyId  = _hotkeyManager.Register(HotkeyManager.Modifiers.Control, Keys.D1);
   ```
   の修飾キー・キーを変更してください。
+- **リサイズ倍率を変更したい**：`TrayApplicationContext.cs` 先頭付近の
+  ```csharp
+  private const double ResizeScale = 0.6;
+  ```
+  を変更してください（例: `1.0` にすればリサイズなし）。
 - **保存先フォルダを変更したい**：`ScreenCapture.cs` の `GetSaveDirectory()` を編集してください。
 - **アイコンを差し替えたい**：`app.ico` をプロジェクトに追加し、`ScreenshotApp.csproj` の
   `<ApplicationIcon>app.ico</ApplicationIcon>` のコメントを外してください（現在はコードでアイコンを動的生成しています）。
@@ -62,6 +72,6 @@ ScreenshotApp/
 ├── TrayApplicationContext.cs  トレイ常駐・メニュー・ホットキー制御のメイン処理
 ├── HotkeyManager.cs           RegisterHotKey の Win32 ラッパー
 ├── OverlayForm.cs             矩形選択用の全画面オーバーレイ
-├── ScreenCapture.cs           画面キャプチャ・保存・クリップボードコピー
+├── ScreenCapture.cs           画面キャプチャ・リサイズ・保存・クリップボードコピー
 └── README.md
 ```

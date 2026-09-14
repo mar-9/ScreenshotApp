@@ -52,27 +52,32 @@ public sealed class HotkeyManager : IDisposable
     private readonly HashSet<int> _registeredIds = new();
     private int _nextId = 1;
 
-    public event Action? HotkeyTriggered; // 単一ホットキー運用向けの簡易イベント
+    /// <summary>
+    /// ホットキーが押されたときに発火。引数は Register が返した ID なので、
+    /// 複数ホットキーを登録している場合はこの ID で判別する。
+    /// </summary>
+    public event Action<int>? HotkeyPressed;
 
     public HotkeyManager()
     {
         _window = new MessageWindow();
-        _window.HotkeyPressed += id => HotkeyTriggered?.Invoke();
+        _window.HotkeyPressed += id => HotkeyPressed?.Invoke(id);
     }
 
     /// <summary>
-    /// ホットキーを登録する。成功した場合 true。
-    /// 例: Register(Modifiers.Control | Modifiers.Shift, Keys.S)
+    /// ホットキーを登録する。成功した場合は識別用の ID(1以上)、失敗した場合は -1 を返す。
+    /// 例: int id = Register(Modifiers.Control | Modifiers.Shift, Keys.S)
     /// </summary>
-    public bool Register(Modifiers modifiers, Keys key)
+    public int Register(Modifiers modifiers, Keys key)
     {
         int id = _nextId++;
         bool ok = RegisterHotKey(_window.Handle, id, (uint)modifiers, (uint)key);
-        if (ok)
+        if (!ok)
         {
-            _registeredIds.Add(id);
+            return -1;
         }
-        return ok;
+        _registeredIds.Add(id);
+        return id;
     }
 
     public void UnregisterAll()
