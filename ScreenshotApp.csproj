@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- 独自アイコンを使いたい場合は app.ico を配置し、下の行のコメントを外してください -->
+    <!-- <ApplicationIcon>app.ico</ApplicationIcon> -->
+
+    <!-- 単一の exe にまとめてビルドしたい場合は以下を有効化 -->
+    <!-- 実行: dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+
+    <!-- タスクトレイ常駐アプリなのでコンソールウィンドウを表示しない -->
+    <StartupObject>ScreenshotApp.Program</StartupObject>
+    <AssemblyName>ScreenshotApp</AssemblyName>
+    <RootNamespace>ScreenshotApp</RootNamespace>
+  </PropertyGroup>
+
+</Project>
