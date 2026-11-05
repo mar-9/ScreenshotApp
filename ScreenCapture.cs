@@ -1,9 +1,50 @@
 using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
 
 namespace ScreenshotApp;
 
 public static class ScreenCapture
 {
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr hWnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
+
+    private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left, Top, Right, Bottom;
+        public Rectangle ToRectangle() => Rectangle.FromLTRB(Left, Top, Right, Bottom);
+    }
+
+    /// <summary>
+    /// アクティブ(最前面)ウィンドウのスクリーン座標の矩形を返す。
+    /// Windows 10/11 では GetWindowRect に透明なリサイズ枠(影)が含まれてしまうため、
+    /// 可能なら DWM の「実際に見えている枠」を優先して使う。
+    /// 取得できない場合や最小化されている場合は null。
+    /// </summary>
+    public static Rectangle? GetActiveWindowRect()
+    {
+        IntPtr hWnd = GetForegroundWindow();
+        if (hWnd == IntPtr.Zero || IsIconic(hWnd)) return null;
+
+        RECT rect;
+        int hr = DwmGetWindowAttribute(hWnd, DWMWA_EXTENDED_FRAME_BOUNDS, out rect, Marshal.SizeOf<RECT>());
+        if (hr != 0 && !GetWindowRect(hWnd, out rect)) return null;
+
+        Rectangle r = rect.ToRectangle();
+        return (r.Width > 0 && r.Height > 0) ? r : null;
+    }
+
     /// <summary>
     /// 指定したスクリーン座標の矩形領域をキャプチャして Bitmap を返す。
     /// </summary>

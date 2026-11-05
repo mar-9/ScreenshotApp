@@ -8,6 +8,8 @@ Windows タスクトレイに常駐し、`Ctrl+Shift+S` で画面上の矩形範
 - グローバルホットキー `Ctrl+Shift+S`（アプリがアクティブでなくても動作）
 - ドラッグで矩形範囲を選択 → キャプチャ（マルチモニター対応）
 - `Ctrl+1` で、範囲選択をやり直さず直前と同じ範囲を再キャプチャ
+- `Ctrl+2` で、アクティブウィンドウをキャプチャ（最小化中は何もしません）
+- デスクトップ通知（バルーン）は表示しません
 - 選択オーバーレイの灰色がキャプチャ画像に写り込まないよう、非表示後にキャプチャする対策済み
 - キャプチャ画像は縦横比を維持したまま **60%** にリサイズしてから保存・コピー（倍率は `TrayApplicationContext.cs` の `ResizeScale` で変更可）
 - 撮影結果はクリップボードに自動コピー
@@ -44,7 +46,8 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 3. 画面が少し暗くなるので、キャプチャしたい範囲をドラッグして選択
 4. マウスを離すとキャプチャされ、60%にリサイズした上でクリップボードにコピー（設定により保存も）されます
 5. 同じ範囲をもう一度撮りたいときは `Ctrl+1`（選択操作は不要）
-6. トレイアイコン右クリックで各種設定・終了ができます
+6. アクティブウィンドウをそのまま撮りたいときは `Ctrl+2`
+7. トレイアイコン右クリックで各種設定・終了ができます
 
 ## カスタマイズしたい場合
 
@@ -52,6 +55,7 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
   ```csharp
   _captureHotkeyId = _hotkeyManager.Register(HotkeyManager.Modifiers.Control | HotkeyManager.Modifiers.Shift, Keys.S);
   _repeatHotkeyId  = _hotkeyManager.Register(HotkeyManager.Modifiers.Control, Keys.D1);
+  _activeWindowHotkeyId = _hotkeyManager.Register(HotkeyManager.Modifiers.Control, Keys.D2);
   ```
   の修飾キー・キーを変更してください。
 - **リサイズ倍率を変更したい**：`TrayApplicationContext.cs` 先頭付近の

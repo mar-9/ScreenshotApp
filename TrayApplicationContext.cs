@@ -21,6 +21,7 @@ public sealed class TrayApplicationContext : ApplicationContext
 
     private readonly int _captureHotkeyId;
     private readonly int _repeatHotkeyId;
+    private readonly int _activeWindowHotkeyId;
 
     private bool _copyToClipboardOnly; // true: クリップボードのみ / false: 保存もする
     private Rectangle? _lastCaptureRect; // Ctrl+1 での再撮影用に、直前の選択範囲を保持
@@ -36,6 +37,10 @@ public sealed class TrayApplicationContext : ApplicationContext
         var repeatItem = new ToolStripMenuItem("前回と同じ範囲を再撮影 (Ctrl+1)");
         repeatItem.Click += async (_, _) => await RepeatLastCaptureAsync();
         menu.Items.Add(repeatItem);
+
+        var activeWindowItem = new ToolStripMenuItem("アクティブウィンドウを撮影 (Ctrl+2)");
+        activeWindowItem.Click += async (_, _) => await CaptureActiveWindowAsync();
+        menu.Items.Add(activeWindowItem);
 
         menu.Items.Add(new ToolStripSeparator());
 
@@ -87,6 +92,10 @@ public sealed class TrayApplicationContext : ApplicationContext
             HotkeyManager.Modifiers.Control,
             Keys.D1);
 
+        _activeWindowHotkeyId = _hotkeyManager.Register(
+            HotkeyManager.Modifiers.Control,
+            Keys.D2);
+
         _hotkeyManager.HotkeyPressed += async id =>
         {
             if (id == _captureHotkeyId)
@@ -97,24 +106,11 @@ public sealed class TrayApplicationContext : ApplicationContext
             {
                 await RepeatLastCaptureAsync();
             }
+            else if (id == _activeWindowHotkeyId)
+            {
+                await CaptureActiveWindowAsync();
+            }
         };
-
-        if (_captureHotkeyId == -1 || _repeatHotkeyId == -1)
-        {
-            _trayIcon.ShowBalloonTip(
-                4000,
-                "ScreenshotApp",
-                "ホットキーの登録に一部失敗しました(Ctrl+Shift+S または Ctrl+1)。他のアプリと競合している可能性があります。トレイアイコンのメニューから手動でキャプチャできます。",
-                ToolTipIcon.Warning);
-        }
-        else
-        {
-            _trayIcon.ShowBalloonTip(
-                2500,
-                "ScreenshotApp",
-                "常駐を開始しました。Ctrl+Shift+S で範囲選択キャプチャ、Ctrl+1 で前回と同じ範囲を再撮影できます。",
-                ToolTipIcon.Info);
-        }
     }
 
     private bool _isCapturing;
@@ -138,7 +134,7 @@ public sealed class TrayApplicationContext : ApplicationContext
             // これをしないと、灰色のオーバーレイが写り込んだ状態でキャプチャされてしまう。
             await Task.Delay(PreCaptureDelayMs);
 
-            await CaptureAndNotifyAsync(r);
+            await CaptureAsync(r);
         };
         overlay.Show();
         overlay.Activate();
@@ -149,43 +145,37 @@ public sealed class TrayApplicationContext : ApplicationContext
     /// </summary>
     private async Task RepeatLastCaptureAsync()
     {
-        if (_lastCaptureRect is not Rectangle r)
-        {
-            _trayIcon.ShowBalloonTip(
-                2500,
-                "ScreenshotApp",
-                "まだキャプチャ範囲が記録されていません。先に Ctrl+Shift+S で範囲を選択してください。",
-                ToolTipIcon.Warning);
-            return;
-        }
+        // まだ一度も範囲選択していない場合は何もしない
+        if (_lastCaptureRect is not Rectangle r) return;
 
         // オーバーレイを開かないので待機は不要、そのままキャプチャする
-        await CaptureAndNotifyAsync(r);
+        await CaptureAsync(r);
+    }
+
+    /// <summary>
+    /// アクティブ(最前面)ウィンドウをキャプチャする(Ctrl+2)。
+    /// </summary>
+    private async Task CaptureActiveWindowAsync()
+    {
+        if (ScreenCapture.GetActiveWindowRect() is not Rectangle r) return;
+        await CaptureAsync(r);
     }
 
     /// <summary>
     /// 指定したスクリーン座標の矩形をキャプチャし、60%リサイズ(縦横比維持)した上で
-    /// クリップボードコピー・(設定により)ファイル保存・通知バルーン表示を行う。
+    /// クリップボードコピー・(設定により)ファイル保存を行う。通知は出さない。
     /// </summary>
-    private async Task CaptureAndNotifyAsync(Rectangle screenRect)
+    private async Task CaptureAsync(Rectangle screenRect)
     {
         using Bitmap raw = ScreenCapture.CaptureRegion(screenRect);
         using Bitmap resized = ScreenCapture.ResizeKeepingAspectRatio(raw, ResizeScale);
 
         ScreenCapture.CopyToClipboard(resized);
 
-        string message;
-        if (_copyToClipboardOnly)
+        if (!_copyToClipboardOnly)
         {
-            message = $"クリップボードにコピーしました。({resized.Width}x{resized.Height})";
+            await Task.Run(() => ScreenCapture.SaveAsPng(resized));
         }
-        else
-        {
-            string path = await Task.Run(() => ScreenCapture.SaveAsPng(resized));
-            message = $"保存しました:\n{path}\n({resized.Width}x{resized.Height} / クリップボードにもコピー済み)";
-        }
-
-        _trayIcon.ShowBalloonTip(2500, "ScreenshotApp", message, ToolTipIcon.Info);
     }
 
     private static Icon CreateTrayIcon()
