@@ -7,8 +7,15 @@ public sealed class TrayApplicationContext : ApplicationContext
     private const string AppName = "ScreenshotApp";
     private const string RunRegistryKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
-    // キャプチャ画像はアスペクト比を維持したままこの倍率でリサイズする(60%)
-    private const double ResizeScale = 0.6;
+    private const string SettingsRegistryKey = @"Software\ScreenshotApp";
+    private const string ResizePercentValueName = "ResizePercent";
+
+    // トレイメニューに表示するリサイズ倍率(%)の選択肢。増減したい場合はここを編集する。
+    private static readonly int[] ResizePercentChoices = { 100, 80, 60, 50, 40, 30, 20 };
+    private const int DefaultResizePercent = 60;
+
+    // キャプチャ画像はアスペクト比を維持したままこの倍率(%)でリサイズする。100 ならリサイズしない。
+    private int _resizePercent = DefaultResizePercent;
 
     // オーバーレイを閉じてから実際に画面をキャプチャするまでの待機時間(ms)。
     // 短すぎるとオーバーレイの色が画面に残った状態でキャプチャされてしまう。
@@ -28,6 +35,8 @@ public sealed class TrayApplicationContext : ApplicationContext
 
     public TrayApplicationContext()
     {
+        _resizePercent = LoadResizePercent();
+
         var menu = new ContextMenuStrip();
 
         var captureItem = new ToolStripMenuItem("範囲選択して撮影 (Ctrl+Shift+S)");
@@ -51,6 +60,29 @@ public sealed class TrayApplicationContext : ApplicationContext
             System.Diagnostics.Process.Start("explorer.exe", dir);
         };
         menu.Items.Add(openFolderItem);
+
+        var resizeMenu = new ToolStripMenuItem("リサイズ倍率");
+        foreach (int percent in ResizePercentChoices)
+        {
+            string label = percent == 100 ? "100% (リサイズなし)" : $"{percent}%";
+            var item = new ToolStripMenuItem(label)
+            {
+                Tag = percent,
+                Checked = percent == _resizePercent,
+            };
+            item.Click += (_, _) =>
+            {
+                _resizePercent = percent;
+                SaveResizePercent(percent);
+                // ラジオボタンのように、選んだ倍率だけにチェックを付ける
+                foreach (ToolStripMenuItem other in resizeMenu.DropDownItems)
+                {
+                    other.Checked = (int)other.Tag! == percent;
+                }
+            };
+            resizeMenu.DropDownItems.Add(item);
+        }
+        menu.Items.Add(resizeMenu);
 
         _copyOnlyMenuItem = new ToolStripMenuItem("クリップボードにのみコピー（ファイル保存しない）")
         {
@@ -168,7 +200,11 @@ public sealed class TrayApplicationContext : ApplicationContext
     private async Task CaptureAsync(Rectangle screenRect)
     {
         using Bitmap raw = ScreenCapture.CaptureRegion(screenRect);
-        using Bitmap resized = ScreenCapture.ResizeKeepingAspectRatio(raw, ResizeScale);
+        // 100% のときはリサイズせず、キャプチャした画像をそのまま使う
+        using Bitmap? scaled = _resizePercent >= 100
+            ? null
+            : ScreenCapture.ResizeKeepingAspectRatio(raw, _resizePercent / 100.0);
+        Bitmap resized = scaled ?? raw;
 
         ScreenCapture.CopyToClipboard(resized);
 
@@ -194,6 +230,36 @@ public sealed class TrayApplicationContext : ApplicationContext
         }
         IntPtr hIcon = bitmap.GetHicon();
         return Icon.FromHandle(hIcon);
+    }
+
+    private static int LoadResizePercent()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(SettingsRegistryKey, writable: false);
+            if (key?.GetValue(ResizePercentValueName) is int saved && ResizePercentChoices.Contains(saved))
+            {
+                return saved;
+            }
+        }
+        catch
+        {
+            // 読み込みに失敗した場合は既定値を使う
+        }
+        return DefaultResizePercent;
+    }
+
+    private static void SaveResizePercent(int percent)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(SettingsRegistryKey);
+            key.SetValue(ResizePercentValueName, percent, RegistryValueKind.DWord);
+        }
+        catch
+        {
+            // 保存に失敗しても動作は継続する(次回起動時に既定値に戻るだけ)
+        }
     }
 
     private static bool IsAutoStartEnabled()

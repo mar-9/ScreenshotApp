@@ -11,7 +11,7 @@ Windows タスクトレイに常駐し、`Ctrl+Shift+S` で画面上の矩形範
 - `Ctrl+2` で、アクティブウィンドウをキャプチャ（最小化中は何もしません）
 - デスクトップ通知（バルーン）は表示しません
 - 選択オーバーレイの灰色がキャプチャ画像に写り込まないよう、非表示後にキャプチャする対策済み
-- キャプチャ画像は縦横比を維持したまま **60%** にリサイズしてから保存・コピー（倍率は `TrayApplicationContext.cs` の `ResizeScale` で変更可）
+- キャプチャ画像は縦横比を維持したままリサイズしてから保存・コピー。倍率はトレイメニューの「リサイズ倍率」から選択（100% / 80% / 60% / 50% / 40% / 30% / 20%、既定 60%、100% はリサイズなし）。選んだ倍率は次回起動時にも引き継がれます
 - 撮影結果はクリップボードに自動コピー
 - 既定では `%USERPROFILE%\Pictures\Screenshots` に PNG として保存（トレイメニューから「クリップボードにのみコピー」に切り替え可）
 - Windows 起動時の自動起動 ON/OFF（トレイメニューのチェックボックス）
@@ -58,11 +58,11 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
   _activeWindowHotkeyId = _hotkeyManager.Register(HotkeyManager.Modifiers.Control, Keys.D2);
   ```
   の修飾キー・キーを変更してください。
-- **リサイズ倍率を変更したい**：`TrayApplicationContext.cs` 先頭付近の
+- **リサイズ倍率の選択肢を変更したい**：`TrayApplicationContext.cs` 先頭付近の
   ```csharp
-  private const double ResizeScale = 0.6;
+  private static readonly int[] ResizePercentChoices = { 100, 80, 60, 50, 40, 30, 20 };
   ```
-  を変更してください（例: `1.0` にすればリサイズなし）。
+  を編集してください（既定値は `DefaultResizePercent`）。
 - **保存先フォルダを変更したい**：`ScreenCapture.cs` の `GetSaveDirectory()` を編集してください。
 - **アイコンを差し替えたい**：`app.ico` をプロジェクトに追加し、`ScreenshotApp.csproj` の
   `<ApplicationIcon>app.ico</ApplicationIcon>` のコメントを外してください（現在はコードでアイコンを動的生成しています）。
